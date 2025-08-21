@@ -33,15 +33,17 @@ struct
     int32_t     udpPort;
 } config;
 
-
-NetSock     server;
-string      configFile="tcp_conduit.conf";
-int         serverResetPipe[2];
-char        tcpBuffer[MAX_MESSAGE_LEN+1];
-char        udpBuffer[66000];
-addrinfo_t  addrinfo; 
-int         senderfd;
-bool        tcpConnected;
+struct 
+{
+    NetSock     server;
+    string      configFile="tcp_conduit.conf";
+    int         serverResetPipe[2];
+    char        tcpBuffer[MAX_MESSAGE_LEN+1];
+    char        udpBuffer[66000];
+    addrinfo_t  addrinfo; 
+    int         senderfd;
+    bool        tcpConnected;
+} g;
 
 void resetSocketThread(int port, int fd);
 void drain(int fd);
@@ -52,7 +54,7 @@ void udpServerThread(int port);
 //=============================================================================
 // Reads the command line options. 
 // Sets global variables:
-//   configFile
+//   g.configFile
 //=============================================================================
 void readOptions(const char** argv)
 {
@@ -73,7 +75,7 @@ void readOptions(const char** argv)
         // Is the user giving us the name of a config file?
         if (option == "-config" && *argv)
         {
-            configFile = *argv++;
+            g.configFile = *argv++;
             continue;
         }
 
@@ -100,7 +102,7 @@ void readConfigFile(string filename)
     // Read the config file and complain if we can't
     if (!c.read(filename, false))
     {
-        cerr << "Not found: " + configFile + "\n";
+        cerr << "Not found: " + g.configFile + "\n";
         exit(1);
     }
 
@@ -149,26 +151,26 @@ int main(int argc, const char** argv)
     readOptions(argv);
 
     // Read the configuration file
-    readConfigFile(configFile);
+    readConfigFile(g.configFile);
 
     // Create a pipe between our thread and the "resetSocketThread"
-    pipe(serverResetPipe);
+    pipe(g.serverResetPipe);
 
     // Fetch the file descriptor of the read-side of the pipe
-    int pipefd = serverResetPipe[0];
+    int pipefd = g.serverResetPipe[0];
 
     // Create the addrinfo structure for sending UDP messages
-    if (!NetUtil::get_server_addrinfo(SOCK_DGRAM, "localhost", 1, AF_INET, &addrinfo))
+    if (!NetUtil::get_server_addrinfo(SOCK_DGRAM, "localhost", 1, AF_INET, &g.addrinfo))
     {
         cerr << "Failed to create addrinfo structure\n";
         exit(1);        
     }
 
     // Create the UDP sendoer socket
-    senderfd = socket(addrinfo.family, addrinfo.socktype, addrinfo.protocol);
+    g.senderfd = socket(g.addrinfo.family, g.addrinfo.socktype, g.addrinfo.protocol);
 
     // If that failed, tell the caller
-    if (senderfd < 0)
+    if (g.senderfd < 0)
     {   
         cerr << "Failed to create UDP socket\n";
         exit(1);
@@ -181,7 +183,7 @@ int main(int argc, const char** argv)
     std::thread th1(
                     resetSocketThread,
                     config.serverPort + 1,
-                    serverResetPipe[1]
+                    g.serverResetPipe[1]
                 );
     th1.detach();
 
@@ -195,29 +197,29 @@ int main(int argc, const char** argv)
         // Throw away any data in the pipe
         drain(pipefd);
 
-        if (!server.create_server(config.serverPort))
+        if (!g.server.create_server(config.serverPort))
         {
             cerr << "Failed to create server on port " << config.serverPort << "\n";
             exit(1);
         }
 
         // Wait for a client to connect to our server
-        server.listen_and_accept();
+        g.server.listen_and_accept();
 
         // Let the UDP server know that we're connected
-        tcpConnected = true;
+        g.tcpConnected = true;
 
         // Indicate to an engineer that we have a connection
-        cout << "Connection from " << server.get_peer_address() << "\n";
+        cout << "Connection from " << g.server.get_peer_address() << "\n";
 
         // Read and handle messages
         readMessages(pipefd);
 
         // Tell the UDP server that we're no longer connected
-        tcpConnected = false;
+        g.tcpConnected = false;
 
         // Close the server.  We'll re-open it at the top of the loop
-        server.close();
+        g.server.close();
 
         // Display a debugging message
         cout << "Server closed, listening for connection\n";
@@ -301,7 +303,7 @@ int serverBytesAvailable(int pipefd)
     fd_set  rfds;
     
     // Find out how many bytes available on the socket
-    int bytesAvailable = server.bytes_available();
+    int bytesAvailable = g.server.bytes_available();
 
     // If for any reason that's invalid, return -1
     if (bytesAvailable < 0) return -1;
@@ -310,7 +312,7 @@ int serverBytesAvailable(int pipefd)
     if (bytesAvailable > 0) return bytesAvailable;
 
     // Fetch the socket descriptor;
-    int sd = server.sd();
+    int sd = g.server.sd();
 
     // Clear our file descriptor set
     FD_ZERO(&rfds);
@@ -333,7 +335,7 @@ int serverBytesAvailable(int pipefd)
     if (!FD_ISSET(sd, &rfds)) return -1;
 
     // Find out how many bytes available for reading from the socket
-    bytesAvailable = server.bytes_available();
+    bytesAvailable = g.server.bytes_available();
 
     // If there's not at least one byte available to read, it means
     // the socket was closed by the peer
@@ -358,7 +360,7 @@ int fetchMessageLength(int pipefd)
     char c, *ptr, *origin;
     
     // Fetch the socket descriptor
-    int sd = server.sd();
+    int sd = g.server.sd();
 
     // Get a byte pointer to the caller's buffer
     origin = ptr = buffer;
@@ -425,7 +427,7 @@ int fetchMessageLength(int pipefd)
 void readMessages(int pipefd)
 {
     // Fetch the socket descriptor of the server
-    int sd = server.sd();
+    int sd = g.server.sd();
 
     while (true)
     {
@@ -436,10 +438,10 @@ void readMessages(int pipefd)
         if (bytesRemaining < 1) return;
 
         // Nul-terminate the message that is arriving into tcpBuffer
-        tcpBuffer[bytesRemaining] = 0;
+        g.tcpBuffer[bytesRemaining] = 0;
 
         // Point to the message buffer
-        char* ptr = tcpBuffer;
+        char* ptr = g.tcpBuffer;
 
         // Fetch the incoming message
         while (bytesRemaining)
@@ -473,12 +475,12 @@ void readMessages(int pipefd)
 void sendMessageToService()
 {
     // Is there a space in the message buffer?
-    char* p = strchr(tcpBuffer, ' ');
+    char* p = strchr(g.tcpBuffer, ' ');
 
     // If there's not, then this message is malformed
     if (p == nullptr)
     {
-        cerr << "Malformed message: " << tcpBuffer << "\n";  
+        cerr << "Malformed message: " << g.tcpBuffer << "\n";  
         return;
     }
 
@@ -496,12 +498,12 @@ void sendMessageToService()
     }
 
     // Go see if this is a service name we recognize
-    auto it = config.serviceMap.find(tcpBuffer);
+    auto it = config.serviceMap.find(g.tcpBuffer);
     
     // If it's not a service name we recognize, we're done
     if (it == config.serviceMap.end())
     {
-        cerr << "Unknown service name: " << tcpBuffer << "\n";
+        cerr << "Unknown service name: " << g.tcpBuffer << "\n";
         return;
     }
 
@@ -509,10 +511,10 @@ void sendMessageToService()
     int port = it->second;
 
     // Tell our addrinfo structure what port to send the message to
-    addrinfo.set_port(port);
+    g.addrinfo.set_port(port);
 
     // And send the JSON message to the service that wants it
-    sendto(senderfd, p, strlen(p), 0, addrinfo, addrinfo.addrlen);
+    sendto(g.senderfd, p, strlen(p), 0, g.addrinfo, g.addrinfo.addrlen);
 }
 //=============================================================================
 
@@ -548,8 +550,8 @@ void udpServerThread(int port)
     }
 
     // The first six bytes of the udpBuffer will contain 5 digits and a space
-    char* msgBuffer = udpBuffer + prefixLen;
-    int   msgBufferLen = sizeof(udpBuffer) - prefixLen;
+    char* msgBuffer = g.udpBuffer + prefixLen;
+    int   msgBufferLen = sizeof(g.udpBuffer) - prefixLen;
 
     // Sit in a loop listening to messages and sending them to the server
     while (true)
@@ -558,7 +560,7 @@ void udpServerThread(int port)
         int byteCount = recvfrom(sd, msgBuffer, msgBufferLen, 0, nullptr, nullptr);
         
         // If we have a message and a client is connected to the TCP server...
-        if (byteCount > 0 && tcpConnected)
+        if (byteCount > 0 && g.tcpConnected)
         {
             // Just in case we want to print the string while debugging
             msgBuffer[byteCount] = 0;
@@ -567,10 +569,10 @@ void udpServerThread(int port)
             sprintf(ascii, "%05i ", byteCount);
 
             // Copy those six characters to the front of udpBuffer
-            memcpy(udpBuffer, ascii, prefixLen);
+            memcpy(g.udpBuffer, ascii, prefixLen);
 
             // And send the entire message up to the TCP client
-            server.send(udpBuffer, byteCount + prefixLen);
+            g.server.send(g.udpBuffer, byteCount + prefixLen);
         }
     }
 }
