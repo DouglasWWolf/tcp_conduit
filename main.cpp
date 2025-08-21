@@ -33,6 +33,7 @@ struct
     int32_t     udpPort;
 } config;
 
+// Non-configuration global variables
 struct 
 {
     NetSock     server;
@@ -350,7 +351,8 @@ int serverBytesAvailable(int pipefd)
 //=============================================================================
 // Find out how many bytes to fetch for the message that follows.
 //
-// We expect the client to send us between 1 and 5 digits, followed by a space.
+// We expect the client to send us between 1 and 5 digits, followed by a
+// linefeed
 // 
 // Return -1 if the server should be closed and reopened
 //=============================================================================
@@ -378,8 +380,15 @@ int fetchMessageLength(int pipefd)
         // Fetch a single byte from the socket
         if (recv(sd, &c, 1, 0) < 1) return -1;
 
-        // Ignore these, just in case this is a user using telnet
-        if (c == 10 || c == 13) continue;
+        // Always ignore leading linefeeds and spaces
+        if (ptr == origin)
+        {
+            if (c == '\n') continue;
+            if (c == ' ' ) continue;
+        }
+
+        // Ignore carriage returns just in case this is a user using telnet
+        if (c == 13) continue;
 
         // We are expecting only digits
         if (c >= '0' && c <= '9')
@@ -388,15 +397,8 @@ int fetchMessageLength(int pipefd)
             continue;            
         }
 
-        // Handle backspace, in case the client is a human-being typing
-        if (c == 8)
-        {
-            if (ptr > origin) --ptr;
-            continue;
-        }
-
-        // On space, we're done accepting characters
-        if (c == ' ' && ptr > origin) break;
+        // On linefeed, we're done accepting characters
+        if (c == '\n') break;
 
         // If we get here, the peer sent us something besides digits!
         return -1;
