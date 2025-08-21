@@ -557,8 +557,6 @@ void udpServerThread(int port)
         // Wait for a UDP message to arrive
         int byteCount = recvfrom(sd, msgBuffer, msgBufferLen, 0, nullptr, nullptr);
         
-        printf("Received %i bytes (%u)\n", byteCount, tcpConnected);
-
         // If we have a message and a client is connected to the TCP server...
         if (byteCount > 0 && tcpConnected)
         {
@@ -570,9 +568,6 @@ void udpServerThread(int port)
 
             // Copy those six characters to the front of udpBuffer
             memcpy(udpBuffer, ascii, prefixLen);
-
-
-            printf("Sent: %s\n", udpBuffer);
 
             // And send the entire message up to the TCP client
             server.send(udpBuffer, byteCount + prefixLen);
