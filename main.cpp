@@ -563,7 +563,7 @@ void udpServerThread(int port)
             // Just in case we want to print the string while debugging
             msgBuffer[byteCount] = 0;
 
-            // Turn 'byteCount' into five digits follow by a space
+            // Turn 'byteCount' into five digits followed by a space
             sprintf(ascii, "%05i ", byteCount);
 
             // Copy those six characters to the front of udpBuffer
