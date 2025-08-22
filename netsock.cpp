@@ -219,7 +219,7 @@ bool NetSock::accept(int timeout_ms, NetSock* dest_sock)
 //==========================================================================================================
 bool NetSock::listen_and_accept(int timeout_ms)
 {
-    listen(0);
+    listen(1);
     return accept(timeout_ms);
 }
 //==========================================================================================================

@@ -522,6 +522,46 @@ void sendMessageToService()
 
 
 //=============================================================================
+// makeServer() - Creates a UDP server on the specified port
+//=============================================================================
+static int makeServer(int port)
+{
+    uint32_t optval = 1;
+
+    // Create the socket and complain if we can't
+    int sd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sd < 0)
+    {
+        std::cerr << "Failed while creating UDP socket\n";
+        exit(1);        
+    }
+
+    // Ensure the socket can be reused
+    setsockopt(sd, SOL_SOCKET, SO_REUSEADDR, (const void *)&optval , sizeof(optval));
+
+    // Build the address structure of the UDP server
+    struct sockaddr_in serveraddr; 
+    memset(&serveraddr, 0, sizeof(serveraddr));
+    serveraddr.sin_family = AF_INET;
+    serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    serveraddr.sin_port = htons((unsigned short)port);
+
+    // Bind the socket to the port
+    if (bind(sd, (struct sockaddr *) &serveraddr, sizeof(serveraddr)) < 0)
+    {
+        std::cerr << "Unable to bind UDP server to port " << port << "\n";
+        exit(1);
+    }
+
+    // Return the socket descriptor to the caller
+    return sd;
+}
+//=============================================================================
+
+
+
+
+//=============================================================================
 // This thread listens for the arrival of UDP message and sends them back up
 // to the client of the TCP server
 //=============================================================================
@@ -531,25 +571,8 @@ void udpServerThread(int port)
     const int prefixLen = 6;
     char ascii[20];
 
-    // Fetch information about the local machine
-    addrinfo_t info = NetUtil::get_local_addrinfo(SOCK_DGRAM, port, "localhost", AF_UNSPEC);
-
-    // Create the socket
-    int sd = socket(info.family, info.socktype, info.protocol);
-
-    // If that failed, tell the caller
-    if (sd < 0)
-    {
-        cerr << "Unable to create UDP server socket\n";
-        exit(1);
-    }
-
-    // Bind the socket to the specified port
-    if (bind(sd, info, info.addrlen) < 0) 
-    {
-        cerr << "Unable to bind UDP server to port " << port << "\n";
-        exit(1);       
-    }
+    // Make our UDP server
+    int sd = makeServer(port);
 
     // The first six bytes of the udpBuffer will contain 5 digits and a space
     char* msgBuffer = g.udpBuffer + prefixLen;

@@ -35,7 +35,7 @@ public:
     bool    create_server(int port, std::string bind_to = "", int family = AF_UNSPEC);
 
     // Call this to start listening for connections.  Can throw runtime_error
-    void    listen(int concurrent_connections = 0);
+    void    listen(int concurrent_connections = 1);
 
     // Call this to wait for someone to connect to a server socket
     bool    accept(int timeout_ms = -1, NetSock* new_sock = NULL);
