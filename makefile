@@ -12,7 +12,7 @@ EXE = tcp_conduit
 # This is a list of directories that have compilable code in them.  If there
 # are no subdirectories, this line must be SUBDIRS = .
 #-----------------------------------------------------------------------------
-SUBDIRS = . 
+SUBDIRS = . utils
 #-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------
@@ -37,7 +37,8 @@ CXXFLAGS =	\
 -Wno-unused-result \
 -Wno-strict-aliasing \
 -fcommon \
--DLINUX 
+-DLINUX  \
+-I utils
 
 
 #-----------------------------------------------------------------------------
@@ -208,14 +209,14 @@ debug:
 
 # DO NOT DELETE
 
-obj_x86/config_file.o: config_file.h tokenizer.h
-obj_x86/tokenizer.o: tokenizer.h
-obj_x86/netsock.o: netsock.h netutil.h
-obj_x86/netutil.o: netutil.h
-obj_x86/main.o: config_file.h netsock.h netutil.h
+obj_x86/main.o: history.h
+obj_x86/utils/config_file.o: utils/config_file.h utils/tokenizer.h
+obj_x86/utils/tokenizer.o: utils/tokenizer.h
+obj_x86/utils/netsock.o: utils/netsock.h utils/netutil.h
+obj_x86/utils/netutil.o: utils/netutil.h
 
-obj_arm/config_file.o: config_file.h tokenizer.h
-obj_arm/tokenizer.o: tokenizer.h
-obj_arm/netsock.o: netsock.h netutil.h
-obj_arm/netutil.o: netutil.h
-obj_arm/main.o: config_file.h netsock.h netutil.h
+obj_arm/main.o: history.h
+obj_arm/utils/config_file.o: utils/config_file.h utils/tokenizer.h
+obj_arm/utils/tokenizer.o: utils/tokenizer.h
+obj_arm/utils/netsock.o: utils/netsock.h utils/netutil.h
+obj_arm/utils/netutil.o: utils/netutil.h
