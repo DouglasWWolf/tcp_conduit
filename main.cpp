@@ -167,7 +167,7 @@ int main(int argc, const char** argv)
         exit(1);        
     }
 
-    // Create the UDP sendoer socket
+    // Create the UDP sender socket
     g.senderfd = socket(g.addrinfo.family, g.addrinfo.socktype, g.addrinfo.protocol);
 
     // If that failed, tell the caller
